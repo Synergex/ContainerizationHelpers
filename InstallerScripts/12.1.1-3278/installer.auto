@@ -1,0 +1,640 @@
+#! /bin/bash
+echo() { /bin/echo -e "$*" ; }	# Non-conforming echo (Linux, etc)
+ # -----------------------------------------------------------------------
+ #
+ # Module:      linux.auto.install - automation script for the
+ #  			       installation menu script for Synergy/DE Linux
+ #
+ # Author:      Tate Chamberlain
+ #
+ # Date:	2022-01-28
+ #
+ # This script will run install.sde in non-interactive mode.
+ # Run 'auto.install -h' for usage information.
+ #
+ # You are welcome to modify this script to suit your particular needs.  
+ # It must be assumed that anyone modifying this script understands 
+ # the results of their actions and Synergex can make no warranty.
+ #
+ # ----------------------------------------------------------------------- 
+
+lmname="License Manager"
+langname="Synergy Language"
+tkname="UI Toolkit"
+rpsname="Repository"
+rptname="ReportWriter"
+sqlname="Connectivity Series"
+servname="xfServer/xfServerPlus"
+
+installnew=0
+installupgrade=0
+installproducts=""
+install1=1
+install2=1
+install3=1
+install4=1
+install5=1
+install6=1
+installpath=""
+licenseename=""
+licenseforwarding=0
+displayusage=0
+registerservice=0
+
+# Get arguments
+# lifewire.com/pass-arguments-to-bash-script-2200571
+while getopts un:l:p:frh option
+do
+	echo "Option: ${option}"
+	case "${option}"
+	in
+		u) {
+			echo "Upgrade"
+			installupgrade=1
+		};;
+		n) {
+			echo "New install, licensee: ${OPTARG}"
+			installnew=1
+			licenseename=${OPTARG}
+			if [ xx"$licenseename" = xx"-u" -o xx"$licenseename" = xx"-l" -o xx"$licenseename" = xx"-p" -o xx"$licenseename" = xx"-h" ]; then
+				echo "Error: Must specify licensee name when using -n option."
+				exit 1
+			fi
+		};;
+		l) {
+			echo "Install location: ${OPTARG}"
+			installpath=${OPTARG}
+		};;
+		p) {
+			echo "Products: ${OPTARG}"
+			# Evaluate argument and find selected products
+			# stackoverflow.com/questions/2829613
+			installproducts=${OPTARG}
+			install1=0
+			install2=0
+			install3=0
+			install4=0
+			install5=0
+			install6=0
+			if [ "${installproducts#*1}" != "$installproducts" ]; then
+				install1=1
+			fi
+			if [ "${installproducts#*2}" != "$installproducts" ]; then
+				install2=1
+			fi
+			if [ "${installproducts#*3}" != "$installproducts" ]; then
+				install3=1
+			fi
+			if [ "${installproducts#*4}" != "$installproducts" ]; then
+				install4=1
+			fi
+			if [ "${installproducts#*5}" != "$installproducts" ]; then
+				install5=1
+			fi
+			if [ "${installproducts#*6}" != "$installproducts" ]; then
+				install6=1
+			fi
+		};;
+		h) {
+			echo "Help"
+			displayusage=1
+		};;
+		f) {
+			echo "License Forwarding To: $licenseename"
+			# Set up license forwarding to specified system
+			licenseforwarding=1
+		};;
+		r) {
+			echo "Register systemd service for synd"
+			registerservice=1
+		};;
+	esac
+done
+
+#echo "Install1 = $install1"
+#echo "Install2 = $install2"
+#echo "Install3 = $install3"
+#echo "Install4 = $install4"
+#echo "Install5 = $install5"
+#echo "Install6 = $install6"
+
+if [ xx"$installnew" = xx"1" -a xx"$installupgrade" = xx"1" ]; then
+{
+	echo "Error: Installation cannot be new and upgrade simultaneously."
+	echo "\tRun 'auto.install -h' for usage information."
+	exit 1
+}
+fi
+
+if [ xx"$installnew" = xx"0" -a xx"$installupgrade" = xx"0" ]; then
+	echo "Must specify installation type: new or upgrade."
+	displayusage=1
+fi
+
+if [ xx"$displayusage" = xx"1" ]; then
+# Display usage info
+echo "This script will automatically accept the Synergex Synergy/DE Product "
+echo "License Agreement (PLA) and will install Synergy/DE in non-interactive mode"
+echo "Usage: "
+echo " linux.auto.install {-u|-n Licensee [-f][-r]} [-l Path] [-p {1|2|3|4|5|6}] "
+echo ""
+echo "-u: Upgrade. Install Synergy on a system that already has"
+echo "\tlicensing configured for the current bit size."
+echo "-n: New. Install Synergy on a system that does not have licensing"
+echo "\tconfigured for the current bit size. Specify licensee name"
+echo "\tor network license server with Licensee argument."
+echo "-f: Enable license forwarding and treat licensee name as license server"
+echo "\tname. Use with -n."
+echo "-r: Register service for synd. Use with -n. If the process with pid of 1"
+echo "\tis systemd, a systemd service will be created. Otherwise, if this is a"
+echo "\tWSL2 instance, commands to set up the environment and start synd will"
+echo "\tbe placed in the system's profile to run when a user logs in. Otherwise,"
+echo "\tan init.d script will be created by default."
+echo "\tIf rsynd.conf exists in the current directory, its contents will be"
+echo "\tused to create rsynd services as well."
+echo ""
+echo "-l: Location. If you want to install Synergy somewhere other than"
+echo "\tthe synergyde directory under the current directory, use the"
+echo "\t-l switch and specify the full path in the Path argument."
+echo ""
+echo "-p: Products. By default, this script will install all available "
+echo "\tSynergy/DE products. If you only want certain products, use"
+echo "\tthe -p switch and select the products you want from the"
+echo "\tfollowing list."
+echo "\t\t1.  $lmname (required for new installations)"
+echo "\t\t2.  Professional Series"
+echo "\t\t    ($langname, $tkname, $rpsname, $rptname)"
+echo "\t\t3.  $rptname"
+echo "\t\t4.  $sqlname"
+echo "\t\t5.  $servname"
+echo "\t\t6.  $langname"
+echo ""
+echo "Make sure to run this script as root or sudo from the same location as"
+echo "install.sde. This script is provided as-is, and no guarantees are made"
+echo "regarding its use or its compatibility with any given OS or Synergy/DE"
+echo "version (though it was tested with Synergy/DE 12.0.1-3271 on Ubuntu 16.04)."
+exit 1
+fi
+
+isroot=$(expr "`id`" : "uid=\(.*\)(.*) gid=")
+if [ $isroot -ne 0 ]; then
+	echo "\tYou must be logged in as \"root\" or use \"sudo\" for correct installation.\n"
+	echo "\tInstallation aborted."
+	exit 1
+fi
+
+numinstallers=`ls | grep -c "\.a$"`
+installername=`ls | grep -m 1 "\.a$"`
+sysid=428
+bitsize=64
+if [ xx"$numinstallers" = xx"1" ]; then
+	sysid=`echo $installername | cut -c1-3`
+	if [ xx"$sysid" = xx"028" ]; then
+		bitsize=32
+	fi
+	echo "Installer archive detected: $installername. Installing for SYID $sysid ($bitsize-bit)."
+else
+	if [ xx"$numinstallers" = xx"0" ]; then
+		echo "No installer archive detected. Assuming SYSID of 428."
+	else
+		echo "Error: Multiple installer archives detected in this directory."
+		echo "Unable to detremine SYSID. Remove all .a files except the installer"
+		echo "you wish to use, and then try again."
+		exit 1
+	fi
+fi
+
+if [ ! -f install.sde ]; then
+	if [ xx"$installername" != xx"" ]; then
+		echo "Couldn't find install.sde. Extracting installer archive $installername."
+		cpio -ivBdum < $installername
+		if [ ! -f install.sde ]; then
+			echo "Couldn't find install.sde in $installername."
+			exit 1
+		fi
+	else
+		echo "Error: Couldn't find install.sde or installer archive."
+		echo "Copy an installer archive to this directory and try again."
+		exit 1
+	fi
+fi
+
+
+
+# Backup the license file and replace with a shorter copy that wont require user input when displayed by "more".
+
+if [ -f TEMPLICENSE.TXT ]; then
+echo "TEMPLICENSE.TXT found, assumed to be the current license text."
+else
+echo "Backing up LICENSE.TXT to TEMPLICENSE.TXT"
+mv LICENSE.TXT TEMPLICENSE.TXT
+fi
+
+echo "By performing a non-interactive installation of Synergy/DE, you implicitly agree to the Synergex Synergy/DE Product License Agreement (PLA)." > LICENSE.TXT
+echo "See LICENSE.TXT for the full text of the PLA." >> LICENSE.TXT
+
+
+# Generate the input file to be redirected into install.sde.
+echo "" > installinput 		# <LF> to get past the welcome screen.
+echo "y" >> installinput 	# Agree to the license.
+echo "1" >> installinput 	# Install Synergy/DE, not xfNetLink Java Edition
+echo "n" >> installinput 	# Next screen
+
+if [ xx"$installnew" = xx"1" ]; then
+echo "" >> installinput 	# Continue past screen that says License Manager will be installed
+fi
+
+if [ xx"$installnew" = xx"0" -a xx"$install1" = xx"1" ]; then
+echo "" >> installinput 	# Select License Manager for installation during upgrade 
+				# (it will automatically be installed in a new install)
+fi
+
+if [ xx"$install2" = xx"1" ]; then
+echo "2" >> installinput 	# Select Professional Series for installation
+fi
+
+if [ xx"$install3" = xx"1" ]; then
+echo "3" >> installinput 	# Select ReportWriter for installation
+fi
+
+if [ xx"$install4" = xx"1" ]; then
+echo "4" >> installinput 	#Select Connectivity Series for installation
+fi
+
+if [ xx"$install5" = xx"1" ]; then
+echo "5" >> installinput 	# Select xfServer/xfServerPlus for installation
+fi
+
+if [ xx"$install6" = xx"1" ]; then
+echo "6" >> installinput 	# Select Synergy Language for installation
+fi
+
+echo "n" >> installinput 	# Next screen
+
+if [ xx"$installpath" = xx"" ]; then
+echo "" >> installinput 		# Accept default installation directory
+else
+echo "2" >> installinput 		# Change installation directory
+echo "$installpath" >> installinput 	# Set new installation directory
+echo "" >> installinput 		# Accept current installation directory
+fi
+
+echo "" >> installinput 	# Do not delete compressed files
+
+if [ xx"$installnew" = xx"1" ]; then
+	#Set up license forwarding, if specified
+	if [ xx"$licenseforwarding" = xx"1" ]; then
+		echo "y" >> installinput 		# Use licenses from existing server
+		echo "$licenseename" >> installinput 	# host(:port)
+		echo "y" >> installinput 		# This is correct
+	else 
+		echo "n" >> installinput 		# Use licenses from existing server
+		echo "$licenseename" >> installinput 	# Licensee name
+		echo "y" >> installinput 		# Confirm licensee name
+	fi
+fi 
+
+sdepath=`pwd`/synergyde/setsde
+if [ xx"$installpath" != xx"" ]; then
+	sdepath=$installpath/setsde
+fi
+
+
+./install.sde < installinput	# Run install script
+
+#Restore the full license file.
+rm LICENSE.TXT
+mv TEMPLICENSE.TXT LICENSE.TXT
+
+if [ xx"$installpath" = xx"" ]; then
+rm synergyde/LICENSE.TXT
+cp LICENSE.TXT synergyde/
+else
+rm "$installpath"/LICENSE.TXT
+cp LICENSE.TXT "$installpath"/
+fi
+
+if [ xx"$registerservice" = xx"1" ]; then
+
+	echo "Registering service(s)..."
+	commandlist=( synd END )
+	portlist=( $sysid )
+
+	lmdir=`pwd`/synergyde/lm
+	if [ xx"$installpath" != xx"" ]; then
+		lmdir=$installpath/lm
+	fi
+	dbldir=`pwd`/synergyde/dbl
+	if [ xx"$installpath" != xx"" ]; then
+		dbldir=$installpath/dbl
+	fi
+
+	if [ -f rsynd.conf ]; then
+		#Parse rsynd.conf, e.g.:
+			# 2330 rsynd
+			# synrc.2330 DAT=/home/devadm/dat
+			# pem rsynd.pem
+			# 2331 rsynd 
+			# 2331 encrypt
+			# synrc.2331 DAT=/home/devadm/dat
+			# 2356 rsynd 
+			# 2356 plus 
+			# 2356 encrypt 
+			# 2356 ruser devadm/\\025\\134\\001j\\017\\134\\270\\021k\\315\\200\\023
+			# synrc.2356 DBLDIR=/usr2/sde64/trunk/dbl
+			# synrc.2356 XFPL_INIPATH=/home/devadm/xfpl/dat
+			# synrc.2356 XFPL_SMCPATH=/home/devadm/xfpl/dat
+		#Lines in rsynd.conf can start in one of three ways:
+		#	With a port number,
+		#	With synrc*, or
+		#	With "pem".
+		#Lines starting with a port number are used to compose the rsynd command used 
+		# to start the rsynd service on that port. The first line in a sequence should be
+		# "#### rsynd" and subsequent lines should specify options for the same service
+		# until configuration is finished (indicated by a new "#### rsynd" line, a line
+		# starting with something other than a port number, or the end of the file). Lines
+		# breaking this sequence (e.g. specifying an option for a service without starting
+		# with "#### rsynd", or specifying an option for a services that's already been 
+		# configured) will generate a warning and will be ignored.
+		# N.B. The script will naively include duplicate settings for the same service.
+		#Possible options for service configuration are:
+		#	encrypt 	- Enables encryption
+		#	cert FILENAME	- A certificate to use instead of DBLDIR:rsynd.pem
+		#	plus		- Start xfServerPlus
+		#	ruser RUSER	- The user to use with the service.
+		#Lines starting with synrc with be appended to the appropriate file in /etc.
+		#Lines starting with pem indicate the name of a file (typically rsynd.pem)
+		# that should be copied to DBLDIR:.
+		#TODO: Support more rsynd options and do more validation.
+		
+		currentport=0
+
+		#Read rsynd.conf and parse each line
+		while read -r line
+		do
+			read -ra CONFIGSETTING <<< "$line"
+			if [[ "${CONFIGSETTING[0]}" =~ ^[0-9]{4,5} ]]; then
+				# We're looking at a port number.
+				if [[ "${CONFIGSETTING[0]}" < 1024 ]]; then
+					echo "Warning: Invalid port number ${CONFIGSETTING[0]}"
+					echo "Skipping line '$line'"
+					continue
+				fi
+				if [[ "${CONFIGSETTING[0]}" > 65535 ]]; then
+					echo "Warning: Invalid port number ${CONFIGSETTING[0]}"
+					echo "Skipping line '$line'"
+					continue
+				fi
+				
+				if [[ "${CONFIGSETTING[1]}" = "rsynd" ]]; then
+					#We're processing a new command.
+					
+					#Check to make sure it isn't in the list
+					echo ${portlist[@]} | grep ${CONFIGSETTING[0]}
+					if [ $? -eq 0 ]; then
+						echo "Warning: Service already configured for port ${CONFIGSETTING[0]}"
+						echo "Skipping line '$line'"
+						continue
+					fi
+
+					if [ $currentport -ne 0 ]; then
+						#Finish current command in progress
+						commandlist=(${commandlist[@]} END)
+						currentport=0
+					fi
+
+					currentport="${CONFIGSETTING[0]}"
+					portlist=(${portlist[@]} "$currentport")
+					commandlist=(${commandlist[@]} "rsynd -p$currentport")
+					continue
+				fi
+
+				#Check to make sure we're still processing the same command
+				if [ $currentport -ne ${CONFIGSETTING[0]} ]; then
+					echo "Warning: Break in sequence."
+					echo "${CONFIGSETTING[0]} does not match current port of $currentport"
+					echo "Skipping line '$line'"
+					continue
+				fi
+
+				if [[ "${CONFIGSETTING[1]}" = "encrypt" ]]; then
+					commandlist=(${commandlist[@]} "-encrypt")
+					continue
+				fi
+
+				if [[ "${CONFIGSETTING[1]}" = "cert" ]]; then
+
+					if [ "${CONFIGSETTING[2]}" = "" ]; then
+						echo "Warning: 'cert' keyword requires certificate argument"
+						echo "Skipping line '$line'"
+						continue
+					fi
+
+					commandlist=(${commandlist[@]} "-cert=${CONFIGSETTING[2]}")
+					continue
+				fi
+
+				if [[ "${CONFIGSETTING[1]}" = "plus" ]]; then
+					commandlist=(${commandlist[@]} "-w")
+					continue
+				fi
+
+				if [[ "${CONFIGSETTING[1]}" = "ruser" ]]; then
+
+					if [ "${CONFIGSETTING[2]}" = "" ]; then
+						echo "Warning: 'ruser' keyword requires RUSER argument"
+						echo "Skipping line '$line'"
+						continue
+					fi
+
+					#Quadruple backslashes
+					ruser=`echo ${CONFIGSETTING[2]} | sed 's/\\\\/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/g'`
+					commandlist=(${commandlist[@]} "-u$ruser")
+					continue
+				fi
+
+				#If we're here, we've run out of possible keywords
+				echo "Warning: unexpected keyword ${CONFIGSETTING[1]}"
+				echo "Skipping line '$line'"
+				continue
+
+			fi
+
+			if [[ "${CONFIGSETTING[0]}" =~ ^synrc.[0-9]{4,5} ]]; then
+				#We're looking at a line to insert into a synrcfile
+
+				if [ $currentport -ne 0 ]; then
+					#Finish current command in progress
+					commandlist=(${commandlist[@]} END)
+					currentport=0
+				fi
+
+				synrcfile=/etc/${CONFIGSETTING[0]}
+				echo "Writing '${CONFIGSETTING[1]}' to $synrcfile"
+				echo "${CONFIGSETTING[1]}" >> $synrcfile
+				continue
+			fi
+
+			if [[ "${CONFIGSETTING[0]}" =~ ^pem ]]; then
+				#We're looking at a pem file to copy to dbldir
+
+				if [ $currentport -ne 0 ]; then
+					#Finish current command in progress
+					commandlist=(${commandlist[@]} END)
+					currentport=0
+				fi
+
+				pemfile=${CONFIGSETTING[1]}
+				if [ -f $pemfile ]; then
+					echo "Copying $pemfile to $dbldir"
+					cp $pemfile $dbldir/
+				else
+					echo "Warning: $pemfile not found"
+					echo "Skipping line '$line'"
+				fi
+				continue
+			fi
+
+			#If we're here, we've run out of possible keywords
+			echo "Warning: unexpected keyword ${CONFIGSETTING[1]}"
+			echo "Skipping line '$line'"
+			continue
+
+			echo $currentport
+
+		done < rsynd.conf
+		if [ $currentport -ne 0 ]; then
+			#Finish current command in progress
+			commandlist=(${commandlist[@]} END)
+			currentport=0
+		fi
+	fi
+
+	portindex=0
+	currentport=0
+	currentcommand=""
+	syndservicename=""
+	for val in ${commandlist[@]}; do
+
+		if [ "$val" != "END" ]; then
+			currentcommand="$currentcommand $val"
+		else
+			currentport=${portlist[$portindex]}
+			if [ $portindex -eq 0 ]; then
+				servicename="synd-$currentport"
+				servicedescription="$bitsize-bit Synergy License Manager"
+				exepath=$lmdir
+			else
+				servicename="rsynd-$currentport"
+				servicedescription="Synergy rsynd service on port $currentport"
+				exepath=$dbldir/bin
+			fi
+
+			if [[ $currentcommand =~ ^[[:space:]] ]]; then
+				currentcommand=`echo $currentcommand | cut -c 1-`
+			fi
+
+			echo "Creating service $servicename for command $currentcommand"
+
+			if ps -p 1 | grep systemd > /dev/null; then
+				# If the process with PID 1 is systemd, create a systemd service.
+				servicename="$servicename.service"
+				servicepath=/etc/systemd/system/$servicename
+				
+				if [ -e $servicepath ]; then
+					echo "Error: $servicepath already exists."
+					exit 1
+				fi
+				
+				echo "Creating systemd $servicename service with the following details:"
+				echo "Filename=$servicepath"
+				echo "Description=$servicedescription"
+				echo "ExecStart=$exepath/$currentcommand"
+				
+				echo "[Unit]" > $servicepath
+				echo "Description=$servicedescription" >> $servicepath
+				if [ $portindex -gt 0 ]; then
+					echo "Requires=$syndservicename" >> $servicepath
+					echo "After=$syndservicename" >> $servicepath
+				fi
+				echo "" >> $servicepath
+				echo "[Service]" >> $servicepath
+				echo "Type=forking" >> $servicepath
+				if [ $portindex -gt 0 ]; then
+					echo "Environment=\"DBLDIR=$dbldir\"" >> $servicepath
+				fi
+				echo "ExecStart=$exepath/$currentcommand" >> $servicepath
+				echo "ExecStop=$exepath/$currentcommand -q" >> $servicepath
+				echo "" >> $servicepath
+				echo "[Install]" >> $servicepath
+				echo "WantedBy=multi-user.target" >> $servicepath
+				systemctl daemon-reload
+				systemctl enable $servicename
+				
+				systemctl start $servicename
+			else
+				# If we aren't using systemd, check whether this is WSL.
+				# If so, assume a single-user environment where the user will 
+				# expect Synergy to be available on login, and put everything in
+				# the profile. Otherwise, assume an init.d system and create an
+				# appropriate script.
+				if uname -r | grep WSL2 > /dev/null; then
+					echo "Adding $servicename to system profile"
+					
+					if [ $portindex -eq 0 ]; then
+						echo "" >> /etc/profile
+						echo ". $sdepath" >> /etc/profile
+					fi
+					echo "$currentcommand" >> /etc/profile
+				else
+					servicepath=/etc/init.d/$servicename
+					echo "Creating init.d $servicename script: $servicepath"
+
+					echo "#!/bin/sh" > $servicepath
+					echo "### BEGIN INIT INFO" >> $servicepath
+					echo "# Provides:          $servicename" >> $servicepath
+					#Make all services dependent on $network and rsynd services 
+					# dependent on synd. $syndservicename is empty when defining
+					# the synd service,so the same code should work inboth cases
+					# without any special logic.
+					echo "# Required-Start:    \$network $syndservicename" >> $servicepath
+					echo "# Required-Stop:     " >> $servicepath
+					echo "# Default-Start:     2 3 4 5" >> $servicepath
+					echo "# Default-Stop:      0 1 6" >> $servicepath
+					echo "# Short-Description: $servicedescription" >> $servicepath
+					echo "### END INIT INFO" >> $servicepath
+					echo "" >> $servicepath
+					echo "case \"\$1\" in" >> $servicepath
+					echo "    start)" >> $servicepath
+					echo "        . $sdepath" >> $servicepath
+					echo "        $currentcommand" >> $servicepath
+					echo "        ;;" >> $servicepath
+					echo "    stop)" >> $servicepath
+					echo "        . $sdepath" >> $servicepath
+					echo "        $currentcommand -q" >> $servicepath
+					echo "        ;;" >> $servicepath
+					echo "esac" >> $servicepath
+					echo "" >> $servicepath
+					echo "exit 0" >> $servicepath
+					chmod a+x $servicepath
+					update-rc.d $servicename defaults
+					service $servicename start
+				fi
+			fi #systemd
+			if [ $portindex -eq 0 ]; then
+				syndservicename=$servicename
+			fi
+			currentcommand=""
+			portindex=$((portindex + 1))
+		fi #final command
+	done
+fi
+
+echo "Finished installing Synergy for SYSID $sysid ($bitsize-bit) $installername"
+
+
+
+
+
+
+
