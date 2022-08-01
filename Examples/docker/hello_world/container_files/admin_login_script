@@ -1,0 +1,6 @@
+
+export TERM=vt100
+
+. /synergyde/setsde
+dbr /home/admin/hello_world.dbr
+

@@ -10,5 +10,5 @@ then
     SSH_PORT=22
 fi
 
-docker run -p $SSH_PORT:22 --ipc=private synergy1211
+docker run -p $SSH_PORT:22 --ipc=private hello_world
 

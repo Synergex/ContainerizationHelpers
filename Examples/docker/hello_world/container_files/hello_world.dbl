@@ -1,0 +1,4 @@
+main
+proc
+	Console.WriteLine("hello world")
+endmain

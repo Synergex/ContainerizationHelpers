@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ -x setup ]
+then
+    source setup
+fi
+
+docker build \
+	-f hello_world.Dockerfile \
+	-t hello_world .
