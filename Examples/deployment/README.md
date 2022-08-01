@@ -1,4 +1,4 @@
-#Example deployments
+# Example deployments
 
 The yaml files in this folder are hard coded to point to an invalid license server, in order to use them you will need to replace comet.synergex.loc with a valid synergy license server url or ip address.
 
