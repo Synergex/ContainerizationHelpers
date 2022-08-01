@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# This environment expects to find a shell script named "setup" that sets the
+# following environment variables:
+#
+#    LM_HOST    The DNS name or TCP/IP address of a Synergy license server
+#
+# Here is an example setup script:
+#
+#   #!/bin/bash
+#   export LM_HOST=1.2.3.4
+#
+if [ -x setup ]
+then
+    source setup
+fi
+
+#if [ -z "$LM_HOST" ]
+#then
+#    echo -e "\nMissing config info. Set LM_HOST\n"
+#else
+    docker build \
+        -f harmonycore.Dockerfile \
+	    -t harmonycore .
+#fi
+
+#	    --build-arg LM_HOST=$LM_HOST \

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ -x setup ]
+then
+    source setup
+fi
+
+if [ -z "$LM_HOST" ]
+then
+    echo -e "\nMissing config info. Set GIT_USER, GIT_TOKEN and LM_HOST\n"
+else
+    docker build \
+        --build-arg LM_HOST=$LM_HOST \
+        --no-cache \
+        -t synergy1211 .
+fi

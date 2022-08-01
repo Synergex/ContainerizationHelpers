@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ -x setup ]
+then
+    source setup
+fi
+
+if [ -z "$SSH_PORT" ]
+then
+    SSH_PORT=2022
+fi
+
+echo "SSH to port $SSH_PORT to connect with the container"
+
+docker run \
+    -p 127.0.0.1:$SSH_PORT:22 \
+    -p 127.0.0.1:8085:8085 \
+    -p 127.0.0.1:8086:8086 \
+    --ipc=private harmonycore
+

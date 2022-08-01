@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ -x setup ]
+then
+    source setup
+fi
+
+if [ -z "$LM_HOST" ]
+then
+    echo -e "\nMissing config info. Set LM_HOST\n"
+else
+    docker build \
+        -f harmonycore.Dockerfile \
+	    --build-arg LM_HOST=$LM_HOST \
+	    --no-cache \
+	    -t harmonycore .
+fi
+
+
+
+

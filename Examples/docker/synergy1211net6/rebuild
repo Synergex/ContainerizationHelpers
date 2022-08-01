@@ -1,0 +1,5 @@
+#!/bin/bash
+
+docker build \
+    --no-cache \
+    -t synergy1211net6 .

@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: synergy-test
+  name: synergy-test
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: synergy-test
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: synergy-test
+    spec:
+      containers:
+      - name: test-container
+        image: jeffkube.azurecr.io/testk3s/synergy1211
+        env:
+        - name: LM_HOST
+          value: comet.synergex.loc
+        ports:
+        - containerPort: 22
+  

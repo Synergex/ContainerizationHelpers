@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ -x setup ]
+then
+    source setup
+fi
+
+if [ -z "$SSH_PORT" ]
+then
+    SSH_PORT=22
+fi
+
+docker run -p $SSH_PORT:22 --ipc=private synergy1211net6
+

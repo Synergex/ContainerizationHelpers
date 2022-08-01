@@ -1,0 +1,9 @@
+#!/bin/bash
+
+echo -e "\nImages\n"
+docker image ls
+
+echo -e "\nContainers\n"
+docker container ls
+
+echo ""

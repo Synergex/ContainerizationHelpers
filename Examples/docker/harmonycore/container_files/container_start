@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Configure a Synergy environment
+source /synergyde/setsde
+
+#if [ -z "$1" ] 
+#then
+    echo LM_HOST=$1 >> /etc/environment
+    lmu -nf $1
+#fi
+
+# Start Synergy License Manager
+/synergyde/lm/synd -d
+
+# Start the hc web server
+/home/admin/service/Services.Host > /var/log/Service.Host.log
